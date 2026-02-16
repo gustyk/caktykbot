@@ -9,7 +9,7 @@ import sys
 import time
 import os
 import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 import json
 
 from loguru import logger
@@ -18,7 +18,15 @@ from loguru import logger
 class HealthCheckHandler(BaseHTTPRequestHandler):
     """Simple HTTP handler for health checks."""
     def do_GET(self):
-        if self.path in ('/health', '/'):
+        if self.path == '/':
+            # Minimalist check for platform readiness
+            self.send_response(200)
+            self.send_header('Content-type', 'text/plain')
+            self.end_headers()
+            self.wfile.write(b"CakTykBot is active")
+            return
+
+        if self.path == '/health':
             from monitoring.health_check import check_all
             try:
                 results = check_all()
@@ -42,7 +50,8 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
 def start_health_server():
     """Start the health check server in a background thread."""
     port = int(os.environ.get("PORT", 8080))
-    server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
+    # Use ThreadingHTTPServer to handle concurrent health check probes
+    server = ThreadingHTTPServer(('0.0.0.0', port), HealthCheckHandler)
     logger.info(f"Health check server listening on port {port}")
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
