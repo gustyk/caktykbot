@@ -153,6 +153,65 @@ class PipelineRun(BaseModel):
         return self
 
 
+class BandarmologiDetail(BaseModel):
+    """Detailed Bandarmologi analysis data."""
+    accumulation_days: int
+    top_brokers: list[str]
+    foreign_net_7d: float
+    base_support: float
+    base_resistance: float
+    distribution_risk: bool
+
+
+class BrokerSummaryBase(BaseModel):
+    """Base schema for Broker Summary data."""
+    symbol: str = Field(..., pattern=r"^[A-Z0-9-]+\.JK$")
+    date: datetime
+    broker_code: str
+    broker_name: str
+    buy_value: float
+    sell_value: float
+    net_value: float
+    buy_lot: int
+    sell_lot: int
+
+    @field_validator("date")
+    @classmethod
+    def ensure_tz_aware(cls, v: datetime) -> datetime:
+        if v.tzinfo is None:
+            v = v.replace(tzinfo=timezone.utc)
+        return v
+
+
+class BrokerSummaryInDB(BrokerSummaryBase):
+    """Broker Summary as stored in database."""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ForeignFlowBase(BaseModel):
+    """Base schema for Foreign Flow data."""
+    symbol: str = Field(..., pattern=r"^[A-Z0-9-]+\.JK$")
+    date: datetime
+    foreign_buy: float
+    foreign_sell: float
+    foreign_net: float
+    foreign_ratio: float
+
+    @field_validator("date")
+    @classmethod
+    def ensure_tz_aware(cls, v: datetime) -> datetime:
+        if v.tzinfo is None:
+            v = v.replace(tzinfo=timezone.utc)
+        return v
+
+
+class ForeignFlowInDB(ForeignFlowBase):
+    """Foreign Flow as stored in database."""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    model_config = ConfigDict(from_attributes=True)
+
+
 class SignalBase(BaseModel):
     """Base schema for trading signals."""
     symbol: str = Field(..., pattern=r"^[A-Z0-9-]+\.JK$")
@@ -296,63 +355,6 @@ class Trade(BaseModel):
         return None
 
 
-class BrokerSummaryBase(BaseModel):
-    """Base schema for Broker Summary data."""
-    symbol: str = Field(..., pattern=r"^[A-Z0-9-]+\.JK$")
-    date: datetime
-    broker_code: str
-    broker_name: str
-    buy_value: float
-    sell_value: float
-    net_value: float
-    buy_lot: int
-    sell_lot: int
-
-    @field_validator("date")
-    @classmethod
-    def ensure_tz_aware(cls, v: datetime) -> datetime:
-        if v.tzinfo is None:
-            v = v.replace(tzinfo=timezone.utc)
-        return v
-
-
-class BrokerSummaryInDB(BrokerSummaryBase):
-    """Broker Summary as stored in database."""
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    model_config = ConfigDict(from_attributes=True)
-
-
-class ForeignFlowBase(BaseModel):
-    """Base schema for Foreign Flow data."""
-    symbol: str = Field(..., pattern=r"^[A-Z0-9-]+\.JK$")
-    date: datetime
-    foreign_buy: float
-    foreign_sell: float
-    foreign_net: float
-    foreign_ratio: float
-
-    @field_validator("date")
-    @classmethod
-    def ensure_tz_aware(cls, v: datetime) -> datetime:
-        if v.tzinfo is None:
-            v = v.replace(tzinfo=timezone.utc)
-        return v
-
-
-class ForeignFlowInDB(ForeignFlowBase):
-    """Foreign Flow as stored in database."""
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    model_config = ConfigDict(from_attributes=True)
-
-
-class BandarmologiDetail(BaseModel):
-    """Detailed Bandarmologi analysis data."""
-    accumulation_days: int
-    top_brokers: list[str]
-    foreign_net_7d: float
-    base_support: float
-    base_resistance: float
-    distribution_risk: bool
 
 
 # Update SignalInDB is complex due to inheritance, we will redefine or patch it if possible. 

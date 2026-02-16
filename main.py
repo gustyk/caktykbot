@@ -92,19 +92,77 @@ def start_app():
         sys.exit(1)
 
 
+def start_bot():
+    """Start only the Telegram bot."""
+    from bot.manager import BotManager
+    from db.connection import MongoManager
+    
+    logger.info("Starting Telegram Bot...")
+    try:
+        db = MongoManager().get_database()
+        bot_manager = BotManager(db)
+        bot_manager.run()
+    except Exception as e:
+        logger.critical(f"Bot failed to start: {e}")
+        sys.exit(1)
+
+
+def start_scheduler():
+    """Start only the background scheduler."""
+    from scheduler.jobs import SchedulerManager
+    
+    logger.info("Starting Background Scheduler...")
+    try:
+        scheduler_manager = SchedulerManager()
+        scheduler_manager.start()
+        # Keep alive since scheduler is background
+        while True:
+            time.sleep(60)
+    except (KeyboardInterrupt, SystemExit):
+        scheduler_manager.stop()
+    except Exception as e:
+        logger.critical(f"Scheduler failed to start: {e}")
+        sys.exit(1)
+
+
+def run_backtest(strategy: str = "all"):
+    """Run backtesting engine."""
+    from backtest.engine import BacktestEngine
+    from datetime import datetime
+    
+    # Defaults for CLI
+    start_date = "2023-01-01"
+    end_date = datetime.now().strftime("%Y-%m-%d")
+    
+    logger.info(f"Starting backtest for {strategy}...")
+    try:
+        engine = BacktestEngine(strategy, start_date, end_date)
+        result = engine.run()
+        logger.success(f"Backtest completed: {result['total_trades']} trades")
+    except Exception as e:
+        logger.error(f"Backtest failed: {e}")
+        sys.exit(1)
+
+
 def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(description="CaktykBot Backend Orchestrator")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
-    # Sync command
+    # Orchestrator
+    subparsers.add_parser("start", help="Start BOTH scheduler and bot (default)")
+    
+    # Components
+    subparsers.add_parser("bot", help="Start ONLY the Telegram bot")
+    subparsers.add_parser("scheduler", help="Start ONLY the background scheduler")
+
+    # Tools
     subparsers.add_parser("sync", help="Run the data pipeline once now")
-
-    # Start command
-    subparsers.add_parser("start", help="Start the background scheduler and bot")
-
-    # Test connection command
     subparsers.add_parser("check", help="Verify configuration and database connection")
+    
+    # Backtest
+    bt_parser = subparsers.add_parser("backtest", help="Run backtesting engine")
+    bt_parser.add_argument("--strategy", default="all", help="Strategy to test (vcp, ema_pullback, bandarmologi, all)")
 
     args = parser.parse_args()
 
@@ -112,6 +170,12 @@ def main():
         run_sync()
     elif args.command == "start":
         start_app()
+    elif args.command == "bot":
+        start_bot()
+    elif args.command == "scheduler":
+        start_scheduler()
+    elif args.command == "backtest":
+        run_backtest(args.strategy)
     elif args.command == "check":
         setup_repositories()
         logger.success("Environment and Database connection verified")
