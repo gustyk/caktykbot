@@ -7,8 +7,46 @@ and verify the application state as defined in Phase 7 implementation.
 import argparse
 import sys
 import time
+import os
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import json
 
 from loguru import logger
+
+
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    """Simple HTTP handler for health checks."""
+    def do_GET(self):
+        if self.path in ('/health', '/'):
+            from monitoring.health_check import check_all
+            try:
+                results = check_all()
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps(results).encode())
+            except Exception as e:
+                self.send_response(500)
+                self.end_headers()
+                self.wfile.write(str(e).encode())
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def log_message(self, format, *args):
+        # Suppress noise in logs
+        return
+
+
+def start_health_server():
+    """Start the health check server in a background thread."""
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
+    logger.info(f"Health check server listening on port {port}")
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server
 
 
 def setup_repositories():
@@ -76,6 +114,10 @@ def start_app():
     
     logger.info("Initializing CakTykBot Production Suite...")
     
+    # Start health server if PORT is provided
+    if "PORT" in os.environ:
+        start_health_server()
+        
     try:
         db = MongoManager().get_database()
         
@@ -98,6 +140,9 @@ def start_bot():
     from db.connection import MongoManager
     
     logger.info("Starting Telegram Bot...")
+    if "PORT" in os.environ:
+        start_health_server()
+        
     try:
         db = MongoManager().get_database()
         bot_manager = BotManager(db)
@@ -112,6 +157,9 @@ def start_scheduler():
     from scheduler.jobs import SchedulerManager
     
     logger.info("Starting Background Scheduler...")
+    if "PORT" in os.environ:
+        start_health_server()
+        
     try:
         scheduler_manager = SchedulerManager()
         scheduler_manager.start()
@@ -144,6 +192,28 @@ def run_backtest(strategy: str = "all"):
         sys.exit(1)
 
 
+def run_dashboard():
+    """Start the Streamlit dashboard."""
+    import subprocess
+    import os
+    
+    logger.info("Starting Streamlit Dashboard...")
+    # Streamlit natively handles health checks at /
+        
+    # Run streamlit as a subprocess
+    port = os.environ.get("PORT", "8501")
+    cmd = [
+        "streamlit", "run", "dashboard/app.py",
+        "--server.port", port,
+        "--server.address", "0.0.0.0"
+    ]
+    try:
+        subprocess.run(cmd, check=True)
+    except Exception as e:
+        logger.error(f"Dashboard failed: {e}")
+        sys.exit(1)
+
+
 def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(description="CaktykBot Backend Orchestrator")
@@ -155,6 +225,7 @@ def main():
     # Components
     subparsers.add_parser("bot", help="Start ONLY the Telegram bot")
     subparsers.add_parser("scheduler", help="Start ONLY the background scheduler")
+    subparsers.add_parser("dashboard", help="Start the Streamlit dashboard")
 
     # Tools
     subparsers.add_parser("sync", help="Run the data pipeline once now")
@@ -174,6 +245,8 @@ def main():
         start_bot()
     elif args.command == "scheduler":
         start_scheduler()
+    elif args.command == "dashboard":
+        run_dashboard()
     elif args.command == "backtest":
         run_backtest(args.strategy)
     elif args.command == "check":
