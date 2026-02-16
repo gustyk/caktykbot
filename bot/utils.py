@@ -15,7 +15,8 @@ def is_admin(func):
         # Allow if user_id matches TELEGRAM_CHAT_ID (assuming it's the admin ID)
         # or if we add a dedicated ADMIN_IDS list later.
         if str(user_id) != str(settings.TELEGRAM_CHAT_ID):
-            await update.message.reply_text("❌ Anda tidak memiliki akses untuk perintah ini.")
+            if update.effective_message:
+                await update.effective_message.reply_text("❌ Anda tidak memiliki akses untuk perintah ini.")
             return
             
         return await func(update, context, *args, **kwargs)
