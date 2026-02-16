@@ -1,6 +1,6 @@
 """Sector Mapping and Verification (RR-005)."""
 
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Any
 from loguru import logger
 
 from db.connection import get_database

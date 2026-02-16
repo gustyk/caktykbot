@@ -1,7 +1,7 @@
 """Circuit Breaker Logic (RR-010)."""
 
 from datetime import datetime, timedelta, timezone
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any
 
 from db.schemas import CircuitBreakerTriggerType
 from risk.constants import (
