@@ -24,16 +24,16 @@ async def handle_bandar_command(update: Update, context: ContextTypes.DEFAULT_TY
     # Note: Repos normally return list of objects.
     # Convert to DataFrame for Strategy
     
-    broker_summary = await broker_repo.get_latest(symbol, limit=10)
-    flow_summary = await flow_repo.get_history(symbol, limit=10)
+    broker_summary = broker_repo.get_latest(symbol, limit=10)
+    flow_summary = flow_repo.get_history(symbol, limit=10)
     
     if not broker_summary and not flow_summary:
         await update.message.reply_text(f"❌ No bandarmologi data found for {symbol}.")
         return
         
     # Convert to DataFrame
-    broker_dicts = [b.dict() for b in broker_summary]
-    flow_dicts = [f.dict() for f in flow_summary]
+    broker_dicts = [b.model_dump() for b in broker_summary]
+    flow_dicts = [f.model_dump() for f in flow_summary]
     
     broker_df = pd.DataFrame(broker_dicts) if broker_dicts else pd.DataFrame()
     flow_df = pd.DataFrame(flow_dicts) if flow_dicts else pd.DataFrame()

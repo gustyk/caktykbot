@@ -27,7 +27,7 @@ async def handle_report_command(update: Update, context: ContextTypes.DEFAULT_TY
             await update.message.reply_text("❌ Invalid format. Use: `/report [MM] [YYYY]`")
             return
 
-    trades = await repo.get_all_closed_trades()
+    trades = repo.get_all_closed_trades()
     # Convert to dicts
     trade_dicts = [t.model_dump() for t in trades]
     
@@ -41,7 +41,7 @@ async def handle_bias_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     db = context.bot_data["db"]
     repo = TradeRepository(db)
     
-    trades = await repo.get_all_closed_trades()
+    trades = repo.get_all_closed_trades()
     trade_dicts = [t.model_dump() for t in trades]
     
     biases = detect_biases(trade_dicts)
@@ -59,7 +59,7 @@ async def handle_scores_command(update: Update, context: ContextTypes.DEFAULT_TY
     db = context.bot_data["db"]
     repo = TradeRepository(db)
     
-    trades = await repo.get_all_closed_trades()
+    trades = repo.get_all_closed_trades()
     trade_dicts = [t.model_dump() for t in trades]
     
     scores = calculate_strategy_scores(trade_dicts)

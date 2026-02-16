@@ -26,6 +26,8 @@ from bot.handlers.heat_handler import handle_heat_command
 from bot.handlers.backtest_handler import backtest_command
 from bot.handlers.report_handler import report_command
 from bot.handlers.health_handler import health_command
+from bot.handlers.bandar_handler import handle_bandar_command
+from bot.handlers.insight_handler import handle_bias_command, handle_scores_command
 
 class BotManager:
     """Manages Telegram bot application and handlers."""
@@ -64,6 +66,9 @@ class BotManager:
         self.app.add_handler(CommandHandler("backtest", backtest_command))
         self.app.add_handler(CommandHandler("report", report_command))
         self.app.add_handler(CommandHandler("health", health_command))
+        self.app.add_handler(CommandHandler("bandar", handle_bandar_command))
+        self.app.add_handler(CommandHandler("bias", handle_bias_command))
+        self.app.add_handler(CommandHandler("scores", handle_scores_command))
         logger.info("Bot handlers registered successfully.")
 
     def run(self):
