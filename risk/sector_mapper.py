@@ -3,9 +3,9 @@
 from typing import List, Dict, Tuple
 from loguru import logger
 
-from caktykbot.db.connection import get_database
-from caktykbot.db.schemas import SectorMap
-from caktykbot.risk.constants import (
+from db.connection import get_database
+from db.schemas import SectorMap
+from risk.constants import (
     MAX_STOCKS_PER_SECTOR,
     MSG_SECTOR_LIMIT
 )

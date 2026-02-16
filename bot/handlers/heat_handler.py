@@ -4,8 +4,8 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from loguru import logger
 
-from caktykbot.db.repositories.portfolio_repo import PortfolioConfigRepository
-from caktykbot.risk.heat_monitor import calculate_portfolio_heat
+from db.repositories.portfolio_repo import PortfolioRepository
+from risk.heat_monitor import calculate_portfolio_heat
 
 async def handle_heat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -16,16 +16,16 @@ async def handle_heat_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
 
     db = context.bot_data["db"]
-    repo = PortfolioConfigRepository(db)
+    repo = PortfolioRepository(db)
     
-    config = await repo.get_config()
+    config = repo.get_config()
     if not config:
         await update.message.reply_text("⚠️ Configuration not found.")
         return
 
     # Fetch open trades
     open_trades_cursor = db.trades.find({"status": "open", "user": config.user})
-    open_trades = await open_trades_cursor.to_list(length=None)
+    open_trades = list(open_trades_cursor)
     
     # Calculate heat
     heat_status = calculate_portfolio_heat(open_trades, config.total_capital, config.max_heat)

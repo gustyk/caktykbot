@@ -4,7 +4,7 @@ from typing import Dict, Any
 
 from loguru import logger
 
-from caktykbot.risk.constants import (
+from risk.constants import (
     MAX_EXPOSURE_PER_STOCK,
     MAX_SMALL_CAP_EXPOSURE,
     MSG_SL_TOO_WIDE,

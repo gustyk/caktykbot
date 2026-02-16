@@ -1,8 +1,8 @@
 """Tests for Position Sizer."""
 
 import pytest
-from caktykbot.risk.position_sizer import calculate_position_size
-from caktykbot.risk.constants import MAX_EXPOSURE_PER_STOCK, MAX_SMALL_CAP_EXPOSURE
+from risk.position_sizer import calculate_position_size
+from risk.constants import MAX_EXPOSURE_PER_STOCK, MAX_SMALL_CAP_EXPOSURE
 
 class TestPositionSizer:
     

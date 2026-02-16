@@ -1,7 +1,7 @@
 """Tests for Portfolio Heat Monitor."""
 
 import pytest
-from caktykbot.risk.heat_monitor import calculate_portfolio_heat, project_heat_with_new_trade
+from risk.heat_monitor import calculate_portfolio_heat, project_heat_with_new_trade
 
 class TestHeatMonitor:
     

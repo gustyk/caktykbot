@@ -3,7 +3,7 @@
 import pandas as pd
 from loguru import logger
 
-from caktykbot.risk.constants import (
+from risk.constants import (
     CORRELATION_THRESHOLD
 )
 

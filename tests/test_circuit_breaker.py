@@ -1,8 +1,8 @@
 """Tests for Circuit Breaker."""
 
 from datetime import datetime, timedelta, timezone
-from caktykbot.risk.circuit_breaker import CircuitBreaker
-from caktykbot.risk.constants import (
+from risk.circuit_breaker import CircuitBreaker
+from risk.constants import (
     CB_DRAWDOWN_TRIGGER, 
     CB_CONSECUTIVE_LOSS_TRIGGER,
     CB_DRAWDOWN_SUSPEND_DAYS,

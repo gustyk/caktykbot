@@ -7,16 +7,16 @@ import pandas as pd
 
 from loguru import logger
 
-from caktykbot.db.schemas import PortfolioConfig, SignalInDB
-from caktykbot.risk.constants import (
+from db.schemas import PortfolioConfig, SignalInDB
+from risk.constants import (
     MAX_RISK_PER_TRADE,
     DEFAULT_RISK_PER_TRADE,
 )
-from caktykbot.risk.circuit_breaker import CircuitBreaker
-from caktykbot.risk.heat_monitor import calculate_portfolio_heat, project_heat_with_new_trade
-from caktykbot.risk.position_sizer import calculate_position_size
-from caktykbot.risk.sector_mapper import check_sector_limit, get_sector_info
-from caktykbot.risk.correlation import calculate_correlation, should_reduce_size_by_correlation
+from risk.circuit_breaker import CircuitBreaker
+from risk.heat_monitor import calculate_portfolio_heat, project_heat_with_new_trade
+from risk.position_sizer import calculate_position_size
+from risk.sector_mapper import check_sector_limit, get_sector_info
+from risk.correlation import calculate_correlation, should_reduce_size_by_correlation
 
 
 @dataclass

@@ -2,7 +2,7 @@
 
 from typing import List, Dict, Any
 
-from caktykbot.risk.constants import (
+from risk.constants import (
     MAX_PORTFOLIO_HEAT,
     HEAT_WARNING_LEVEL,
     MIN_CASH_RESERVE,

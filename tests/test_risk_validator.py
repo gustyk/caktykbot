@@ -2,8 +2,8 @@
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from caktykbot.risk.risk_validator import RiskValidator
-from caktykbot.db.schemas import PortfolioConfig
+from risk.risk_validator import RiskValidator
+from db.schemas import PortfolioConfig
 
 class TestRiskValidator:
     

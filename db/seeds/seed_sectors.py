@@ -8,8 +8,8 @@ from datetime import datetime, timezone
 # Add project root to path
 sys.path.append(os.getcwd())
 
-from caktykbot.db.connection import get_db
-from caktykbot.db.schemas import SectorMap, MarketCapCategory
+from db.connection import get_db
+from db.schemas import SectorMap, MarketCapCategory
 from loguru import logger
 
 SECTOR_DATA = [

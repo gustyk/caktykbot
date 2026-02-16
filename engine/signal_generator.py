@@ -46,7 +46,7 @@ class SignalGenerator:
         self.trade_repo = trade_repo
         self.db = db # Fallback if repos not passed
         
-        from caktykbot.risk.risk_validator import RiskValidator
+        from risk.risk_validator import RiskValidator
         self.risk_validator = RiskValidator()
 
     async def generate(
@@ -121,50 +121,29 @@ class SignalGenerator:
         if self.portfolio_repo and self.trade_repo:
             try:
                 # 1. Fetch Config
-                config = await self.portfolio_repo.get_config()
+                config = self.portfolio_repo.get_config()
                 if not config:
                     logger.warning("Risk validation skipped: No portfolio config.")
                     return base_signal
                     
                 # 2. Fetch Open Trades
-                # If we don't have explicit TradeRepo method for open trades, use raw db or implement it.
-                # Assuming trade_repo has get_open_trades or we filter.
-                # Let's check TradeRepo capability or use DB.
-                # If trade_repo is generic, maybe we use db directly if available?
-                # For now assuming trade_repo.get_open_trades exists or we use db.
-                # Plan says: "reads from multiple repos".
-                
                 open_trades = []
                 if hasattr(self.trade_repo, "get_open_trades"):
-                    open_trades = await self.trade_repo.get_open_trades(config.user)
+                    open_trades = self.trade_repo.get_open_trades(config.user)
                 elif self.db:
                     cursor = self.db.trades.find({"status": "open", "user": config.user})
-                    open_trades = await cursor.to_list(length=None)
+                    open_trades = list(cursor)
                 
                 # 3. Closed Trades (for Circuit Breaker)
-                # Ideally fetch recent ones only? Or CB handles it?
-                # CB needs full history or recent history.
-                # Let's fetch recent closed trades (last 30 days?)
-                # Optimally CB tracks state in DB.
-                # But we implemented CB to calculate from trades.
-                # Let's assume we pass all closed trades or recent ones.
-                # To be safe, let's skip sophisticated CB state fetch here to avoid performance hit
-                # and rely on CB looking up if we passed it?
-                # Actually CB implementation `check` takes `closed_trades`.
-                # We should fetch them.
-                
                 closed_trades = []
                 if self.db:
-                   # Fetch trades closed in current month and last 5 trades?
-                   # Simplified: fetch all closed trades for now (assuming low volume)
-                   # Optimization for later: LIMIT fields and date.
                    cursor = self.db.trades.find({"status": "closed", "user": config.user})
-                   closed_trades = await cursor.to_list(length=None)
+                   closed_trades = list(cursor)
                    
                 # 4. Fetch Active CB Event
                 active_cb = None
                 if self.db:
-                    active_cb = await self.db.circuit_breaker_events.find_one({"resolved": False})
+                    active_cb = self.db.circuit_breaker_events.find_one({"resolved": False})
                 
                 # ---------------------------------------------------------
                 # ADAPTIVE SCORING (Sprint 5)

@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from caktykbot.risk.sector_mapper import get_sector_info, check_sector_limit
+from risk.sector_mapper import get_sector_info, check_sector_limit
 
 class TestSectorMapper:
     

@@ -2,7 +2,7 @@
 
 import pytest
 import pandas as pd
-from caktykbot.risk.correlation import calculate_correlation, should_reduce_size_by_correlation
+from risk.correlation import calculate_correlation, should_reduce_size_by_correlation
 
 class TestCorrelation:
     

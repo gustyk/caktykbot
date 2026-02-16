@@ -4,9 +4,9 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from loguru import logger
 
-from caktykbot.db.repositories.portfolio_repo import PortfolioConfigRepository
-from caktykbot.risk.position_sizer import calculate_position_size
-from caktykbot.risk.sector_mapper import get_sector_info
+from db.repositories.portfolio_repo import PortfolioRepository
+from risk.position_sizer import calculate_position_size
+from risk.sector_mapper import get_sector_info
 
 async def handle_size_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -45,10 +45,10 @@ async def handle_size_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             return
 
     db = context.bot_data["db"]
-    repo = PortfolioConfigRepository(db)
+    repo = PortfolioRepository(db)
     
     # Fetch config
-    config = await repo.get_config()
+    config = repo.get_config()
     if not config:
         await update.message.reply_text("⚠️ Configuration not found. Use `/capital` to set up first.")
         return
@@ -104,9 +104,9 @@ async def handle_size_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     # DB access is fine.
 
     open_trades_cursor = db.trades.find({"status": "open", "user": config.user})
-    open_trades = await open_trades_cursor.to_list(length=None)
+    open_trades = list(open_trades_cursor)
 
-    from caktykbot.risk.heat_monitor import calculate_portfolio_heat, project_heat_with_new_trade
+    from risk.heat_monitor import calculate_portfolio_heat, project_heat_with_new_trade
     
     heat_status = calculate_portfolio_heat(open_trades, capital, config.max_heat)
     current_heat = heat_status["current_heat"]

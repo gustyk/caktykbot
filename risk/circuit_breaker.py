@@ -3,8 +3,8 @@
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional, Tuple
 
-from caktykbot.db.schemas import CircuitBreakerTriggerType
-from caktykbot.risk.constants import (
+from db.schemas import CircuitBreakerTriggerType
+from risk.constants import (
     CB_DRAWDOWN_TRIGGER,
     CB_CONSECUTIVE_LOSS_TRIGGER,
     CB_DRAWDOWN_SUSPEND_DAYS,
