@@ -18,6 +18,10 @@ from loguru import logger
 class HealthCheckHandler(BaseHTTPRequestHandler):
     """Simple HTTP handler for health checks."""
     def do_GET(self):
+        # Always flush logs on request for debugging
+        sys.stdout.flush()
+        sys.stderr.flush()
+        
         if self.path == '/':
             # Minimalist check for platform readiness
             self.send_response(200)
@@ -123,10 +127,6 @@ def start_app():
     
     logger.info("Initializing CakTykBot Production Suite...")
     
-    # Start health server if PORT is provided
-    if "PORT" in os.environ:
-        start_health_server()
-        
     try:
         db = MongoManager().get_database()
         
@@ -149,9 +149,6 @@ def start_bot():
     from db.connection import MongoManager
     
     logger.info("Starting Telegram Bot...")
-    if "PORT" in os.environ:
-        start_health_server()
-        
     try:
         db = MongoManager().get_database()
         bot_manager = BotManager(db)
@@ -166,9 +163,6 @@ def start_scheduler():
     from scheduler.jobs import SchedulerManager
     
     logger.info("Starting Background Scheduler...")
-    if "PORT" in os.environ:
-        start_health_server()
-        
     try:
         scheduler_manager = SchedulerManager()
         scheduler_manager.start()
@@ -225,6 +219,23 @@ def run_dashboard():
 
 def main():
     """Main CLI entry point."""
+    print("="*40)
+    print("CAKTYKBOT STARTING...")
+    print(f"Time: {time.ctime()}")
+    print(f"CWD: {os.getcwd()}")
+    print("="*40)
+    sys.stdout.flush()
+
+    # Start health server as early as possible for cloud platforms
+    # We do this before heavy imports or settings validation
+    if "PORT" in os.environ:
+        try:
+            start_health_server()
+        except Exception as e:
+            # We don't want to crash the whole app if health server fails
+            # but we should log it
+            print(f"CRITICAL: Failed to start health server: {e}", file=sys.stderr)
+
     parser = argparse.ArgumentParser(description="CaktykBot Backend Orchestrator")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
