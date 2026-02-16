@@ -69,7 +69,7 @@ def setup_repositories():
     from db.repositories.price_repo import PriceRepository
     from db.repositories.stock_repo import StockRepository
     from db.repositories.signal_repo import SignalRepository
-    from db.repositories.portfolio_repo import PortfolioConfigRepository
+    from db.repositories.portfolio_repo import PortfolioRepository
     from db.repositories.trade_repo import TradeRepository
     
     try:
@@ -79,7 +79,7 @@ def setup_repositories():
             "price": PriceRepository(db),
             "pipeline": PipelineRepository(db),
             "signal": SignalRepository(db),
-            "portfolio": PortfolioConfigRepository(db),
+            "portfolio": PortfolioRepository(db),
             "trade": TradeRepository(db),
         }
     except Exception as e:
