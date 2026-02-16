@@ -226,16 +226,6 @@ def main():
     print("="*40)
     sys.stdout.flush()
 
-    # Start health server as early as possible for cloud platforms
-    # We do this before heavy imports or settings validation
-    if "PORT" in os.environ:
-        try:
-            start_health_server()
-        except Exception as e:
-            # We don't want to crash the whole app if health server fails
-            # but we should log it
-            print(f"CRITICAL: Failed to start health server: {e}", file=sys.stderr)
-
     parser = argparse.ArgumentParser(description="CaktykBot Backend Orchestrator")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
@@ -256,6 +246,14 @@ def main():
     bt_parser.add_argument("--strategy", default="all", help="Strategy to test (vcp, ema_pullback, bandarmologi, all)")
 
     args = parser.parse_args()
+
+    # Start health server early for cloud platforms, EXCEPT for dashboard
+    # which manages its own HTTP port and health check mechanism.
+    if args.command in ["start", "bot", "scheduler"] and "PORT" in os.environ:
+        try:
+            start_health_server()
+        except Exception as e:
+            print(f"CRITICAL: Failed to start health server: {e}", file=sys.stderr)
 
     if args.command == "sync":
         run_sync()
