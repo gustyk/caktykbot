@@ -1,5 +1,7 @@
 """Bot manager to handle lifecycle and wiring."""
 
+import sys
+from telegram import error as tg_error
 from telegram.ext import Application, CommandHandler
 from telegram.request import HTTPXRequest
 from loguru import logger
@@ -28,6 +30,26 @@ from bot.handlers.report_handler import report_command
 from bot.handlers.health_handler import health_command
 from bot.handlers.bandar_handler import handle_bandar_command
 from bot.handlers.insight_handler import handle_bias_command, handle_scores_command
+
+
+async def _error_handler(update, context):
+    """Global error handler for the bot."""
+    err = context.error
+    if isinstance(err, tg_error.Conflict):
+        # Another bot instance is running — exit immediately so Railway/Docker
+        # does NOT keep retrying the same broken instance.
+        logger.critical(
+            "❌ Conflict: another bot instance is already polling. "
+            "Ensure only ONE replica is running. Exiting..."
+        )
+        sys.exit(1)
+    elif isinstance(err, tg_error.NetworkError):
+        logger.warning(f"Network error (will retry): {err}")
+    elif isinstance(err, tg_error.TimedOut):
+        logger.warning(f"Request timed out (will retry): {err}")
+    else:
+        logger.error(f"Unhandled bot error: {err}", exc_info=err)
+
 
 class BotManager:
     """Manages Telegram bot application and handlers."""
@@ -69,11 +91,20 @@ class BotManager:
         self.app.add_handler(CommandHandler("bandar", handle_bandar_command))
         self.app.add_handler(CommandHandler("bias", handle_bias_command))
         self.app.add_handler(CommandHandler("scores", handle_scores_command))
+
+        # Register global error handler
+        self.app.add_error_handler(_error_handler)
         logger.info("Bot handlers registered successfully.")
 
     def run(self):
-        """Run the bot in polling mode (Sprint 1 default)."""
+        """Run the bot in polling mode."""
         logger.info("Starting Telegram bot (polling mode)...")
-        # In a real production environment, we might use webhooks on Railway,
-        # but for Sprint 1 polling is the chosen implementation.
-        self.app.run_polling(drop_pending_updates=True)
+        # drop_pending_updates=True ensures any webhook or stale pending
+        # getUpdates from a previously running instance is cleared before
+        # this instance starts polling — prevents the Conflict error on
+        # Railway redeploys.
+        self.app.run_polling(
+            drop_pending_updates=True,
+            allowed_updates=None,   # receive all update types
+        )
+

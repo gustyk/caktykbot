@@ -1,0 +1,14 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+# Explicitly define the start command so Railway does NOT
+# auto-discover Procfile and try to run multiple processes.
+# We run BOTH scheduler and bot in one process via `start`.
+startCommand = "python main.py start"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+[deploy.healthcheck]
+path = "/"
+timeout = 30
