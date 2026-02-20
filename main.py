@@ -14,6 +14,17 @@ import json
 
 from loguru import logger
 
+# ── Early env diagnostic (runs before any import that triggers settings) ──────
+_REQUIRED_VARS = ["MONGO_URI", "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"]
+_present = [v for v in _REQUIRED_VARS if os.environ.get(v)]
+_missing = [v for v in _REQUIRED_VARS if not os.environ.get(v)]
+print(f"[ENV CHECK] Present: {_present}", flush=True)
+if _missing:
+    print(f"[ENV CHECK] ⚠️  MISSING vars: {_missing}", flush=True)
+else:
+    print("[ENV CHECK] ✅ All required env vars found.", flush=True)
+# ─────────────────────────────────────────────────────────────────────────────
+
 
 class HealthCheckHandler(BaseHTTPRequestHandler):
     """Simple HTTP handler for health checks."""

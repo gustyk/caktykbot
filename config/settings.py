@@ -24,10 +24,16 @@ class Settings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
+        # Try to load .env file if present (local dev), but don't fail if missing
         env_file=".env",
         env_file_encoding="utf-8",
-        case_sensitive=True,
+        # IMPORTANT: case_sensitive=True can break env var reading on some
+        # pydantic-settings versions when there's no .env file. Remove it so
+        # pydantic-settings reads from os.environ correctly on all platforms.
+        case_sensitive=False,
         extra="ignore",
+        # Don't treat empty string "" as a value (treat as missing)
+        env_ignore_empty=True,
     )
 
     # MongoDB Configuration
