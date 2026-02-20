@@ -2,13 +2,12 @@
 builder = "nixpacks"
 
 [deploy]
-# Explicitly define the start command so Railway does NOT
-# auto-discover Procfile and try to run multiple processes.
-# We run BOTH scheduler and bot in one process via `start`.
+# Single command runs: Streamlit dashboard (on $PORT) + bot + scheduler
 startCommand = "python main.py start"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
 
 [deploy.healthcheck]
+# Streamlit serves HTTP on $PORT, so Railway health check hits it directly
 path = "/"
-timeout = 30
+timeout = 60

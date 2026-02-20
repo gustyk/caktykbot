@@ -62,15 +62,43 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
         return
 
 
-def start_health_server():
+def start_health_server(port: int = None):
     """Start the health check server in a background thread."""
-    port = int(os.environ.get("PORT", 8080))
+    if port is None:
+        port = int(os.environ.get("PORT", 8080))
     # Use ThreadingHTTPServer to handle concurrent health check probes
     server = ThreadingHTTPServer(('0.0.0.0', port), HealthCheckHandler)
     logger.info(f"Health check server listening on port {port}")
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     return server
+
+
+def start_dashboard_subprocess(port: int) -> "subprocess.Popen":
+    """Launch Streamlit dashboard as a background subprocess."""
+    import subprocess
+    cmd = [
+        sys.executable, "-m", "streamlit", "run", "dashboard/app.py",
+        "--server.port", str(port),
+        "--server.address", "0.0.0.0",
+        "--server.headless", "true",        # required for Railway (no browser)
+        "--server.enableCORS", "false",
+        "--server.enableXsrfProtection", "false",
+    ]
+    logger.info(f"Starting Streamlit dashboard as background process on port {port}...")
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    # Give Streamlit a moment to start
+    import time
+    time.sleep(4)
+    if proc.poll() is not None:
+        logger.error(f"Streamlit failed to start (exit code: {proc.returncode})")
+    else:
+        logger.info(f"✅ Streamlit dashboard running on port {port}")
+    return proc
 
 
 def setup_repositories():
@@ -131,24 +159,34 @@ def run_sync():
 
 
 def start_app():
-    """Start the scheduler and Telegram bot."""
+    """Start the scheduler, Telegram bot, and (on Railway) the dashboard."""
     from scheduler.jobs import SchedulerManager
     from bot.manager import BotManager
     from db.connection import MongoManager
-    
+
     logger.info("Initializing CakTykBot Production Suite...")
-    
+
     try:
         db = MongoManager().get_database()
-        
-        # 1. Start Scheduler (Background)
+
+        # 1. On Railway ($PORT is set): launch Streamlit on $PORT so the public
+        #    URL shows the dashboard. Health monitoring uses internal port 8081.
+        #    Locally (no $PORT): skip Streamlit, health server already started.
+        is_cloud = "PORT" in os.environ
+        if is_cloud:
+            public_port = int(os.environ["PORT"])
+            start_dashboard_subprocess(public_port)
+            # Internal health/status endpoint for monitoring (not the public URL)
+            start_health_server(port=8081)
+
+        # 2. Start Scheduler (Background)
         scheduler_manager = SchedulerManager()
         scheduler_manager.start()
-        
-        # 2. Start Bot (Blocking polling)
+
+        # 3. Start Bot (Blocking — must be last)
         bot_manager = BotManager(db)
         bot_manager.run()
-        
+
     except Exception as e:
         logger.critical(f"Application failed to start: {e}")
         sys.exit(1)
@@ -258,9 +296,10 @@ def main():
 
     args = parser.parse_args()
 
-    # Start health server early for cloud platforms, EXCEPT for dashboard
-    # which manages its own HTTP port and health check mechanism.
-    if args.command in ["start", "bot", "scheduler"] and "PORT" in os.environ:
+    # Start health server for standalone 'bot' and 'scheduler' modes only.
+    # For 'start' mode, Streamlit owns $PORT — health server is started
+    # inside start_app() on a fixed internal port instead.
+    if args.command in ["bot", "scheduler"] and "PORT" in os.environ:
         try:
             start_health_server()
         except Exception as e:
