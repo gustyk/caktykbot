@@ -1,6 +1,7 @@
 """Bot manager to handle lifecycle and wiring."""
 
 import sys
+import time
 from telegram import error as tg_error
 from telegram.ext import Application, CommandHandler
 from telegram.request import HTTPXRequest
@@ -33,16 +34,19 @@ from bot.handlers.insight_handler import handle_bias_command, handle_scores_comm
 
 
 async def _error_handler(update, context):
-    """Global error handler for the bot."""
+    """Global error handler for the bot.
+    
+    NOTE: Conflict errors are handled by the retry loop in BotManager.run(),
+    NOT by exiting here. Exiting on Conflict causes Railway to immediately
+    restart, which hits the same Conflict — creating an infinite restart loop.
+    """
     err = context.error
     if isinstance(err, tg_error.Conflict):
-        # Another bot instance is running — exit immediately so Railway/Docker
-        # does NOT keep retrying the same broken instance.
-        logger.critical(
-            "❌ Conflict: another bot instance is already polling. "
-            "Ensure only ONE replica is running. Exiting..."
+        # Just log — the run() retry loop will handle waiting & retrying.
+        logger.warning(
+            "⚡ Conflict detected (another instance still active). "
+            "Waiting for old container to shut down..."
         )
-        sys.exit(1)
     elif isinstance(err, tg_error.NetworkError):
         logger.warning(f"Network error (will retry): {err}")
     elif isinstance(err, tg_error.TimedOut):
@@ -97,14 +101,57 @@ class BotManager:
         logger.info("Bot handlers registered successfully.")
 
     def run(self):
-        """Run the bot in polling mode."""
-        logger.info("Starting Telegram bot (polling mode)...")
-        # drop_pending_updates=True ensures any webhook or stale pending
-        # getUpdates from a previously running instance is cleared before
-        # this instance starts polling — prevents the Conflict error on
-        # Railway redeploys.
-        self.app.run_polling(
-            drop_pending_updates=True,
-            allowed_updates=None,   # receive all update types
+        """Run the bot in polling mode with Conflict retry logic.
+        
+        On Railway, a new container starts before the old one is killed.
+        This causes a transient Conflict error (~30-60s). We retry with
+        a backoff instead of exiting, which would cause an infinite loop.
+        """
+        max_retries = 10
+        retry_delay = 30  # seconds — Railway typically kills old container within 30s
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                logger.info(f"Starting Telegram bot (polling mode, attempt {attempt}/{max_retries})...")
+                # run_polling is blocking. drop_pending_updates clears stale sessions.
+                self.app.run_polling(
+                    drop_pending_updates=True,
+                    allowed_updates=None,
+                )
+                # If run_polling() returns normally (e.g. graceful shutdown), exit loop
+                logger.info("Bot polling stopped gracefully.")
+                break
+
+            except tg_error.Conflict:
+                if attempt >= max_retries:
+                    logger.critical(
+                        f"❌ Still in Conflict after {max_retries} attempts. "
+                        "Another bot instance may be permanently running. Exiting."
+                    )
+                    sys.exit(1)
+
+                logger.warning(
+                    f"⚡ Conflict on attempt {attempt}/{max_retries}. "
+                    f"Old container still active — waiting {retry_delay}s before retry..."
+                )
+                # Rebuild the Application so we get a fresh HTTP connection pool
+                # (the old one may be in a broken state after Conflict)
+                self._rebuild_app()
+                time.sleep(retry_delay)
+
+            except Exception as e:
+                logger.critical(f"Bot crashed unexpectedly: {e}")
+                sys.exit(1)
+
+    def _rebuild_app(self):
+        """Rebuild the Application instance to get fresh connections after Conflict."""
+        from config.settings import settings
+        self.app = (
+            Application.builder()
+            .token(settings.TELEGRAM_BOT_TOKEN)
+            .request(HTTPXRequest(connection_pool_size=8, connect_timeout=30.0, read_timeout=30.0))
+            .build()
         )
+        self.app.bot_data["db"] = self.db
+        self._setup_handlers()
 
