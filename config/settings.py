@@ -172,11 +172,13 @@ class Settings(BaseSettings):
         # Format: <bot_id>:<token>
         # bot_id: digits
         # token: 35 characters (alphanumeric, underscore, hyphen)
-        pattern = r"^\d+:[A-Za-z0-9_-]{35}$"
+        # Telegram token format: <bot_id>:<token>
+        # Token part is typically 35-36 alphanumeric characters (with _ and -)
+        pattern = r"^\d+:[A-Za-z0-9_-]{35,36}$"
         if not re.match(pattern, v):
             raise InvalidSettingsError(
                 "TELEGRAM_BOT_TOKEN format invalid. "
-                "Expected format: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz (35 chars after colon)"
+                "Expected format: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz (35-36 chars after colon)"
             )
 
         return v
@@ -267,6 +269,12 @@ def get_settings() -> Settings:
             )
         except Exception as e:
             logger.critical(f"Failed to load settings: {e}")
+            # Print each validation error field individually for easier debugging
+            if hasattr(e, "errors"):
+                for err in e.errors():
+                    field = " -> ".join(str(loc) for loc in err.get("loc", []))
+                    msg = err.get("msg", "")
+                    logger.critical(f"  ❌ Config error | Field: [{field}] | {msg}")
             logger.critical("Application cannot start without valid configuration")
             sys.exit(1)
 
