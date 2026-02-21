@@ -289,8 +289,28 @@ def fetch_support_resistance(symbol: str, period: str = "6mo") -> dict:
         support    = float(max(s_below)) if s_below else S1
         resistance = float(min(r_above)) if r_above else R1
 
+        # Guard: if spread too tight (< 1%), widen to next-best S2/R2
+        if resistance > 0 and (resistance - support) / resistance < 0.01:
+            support    = S2 if S2 < support    else support
+            resistance = R2 if R2 > resistance else resistance
+            logger.info(
+                f"S/R {symbol}: spread too tight, widened to S2/R2 → "
+                f"support={support:.0f} resistance={resistance:.0f}"
+            )
+
+        # buy_high must always be strictly below sell_target
+        # Cap at 99.5 % of resistance so the buy zone never overlaps
+        raw_buy_high = support * 1.015
+        buy_high = min(raw_buy_high, resistance * 0.995)
+
+        # If that still inverts (ultra-tight stock), just use midpoint
+        midpoint = (support + resistance) / 2
+        if buy_high >= resistance:
+            buy_high = midpoint
+
         logger.info(
-            f"S/R {symbol}: price={cur:.0f} | support={support:.0f} | resistance={resistance:.0f}"
+            f"S/R {symbol}: price={cur:.0f} | support={support:.0f} | "
+            f"buy_high={buy_high:.0f} | resistance={resistance:.0f}"
         )
 
         return {
@@ -298,7 +318,7 @@ def fetch_support_resistance(symbol: str, period: str = "6mo") -> dict:
             "support":       round(support, 0),
             "resistance":    round(resistance, 0),
             "buy_low":       round(support, 0),
-            "buy_high":      round(support * 1.03, 0),
+            "buy_high":      round(buy_high, 0),
             "sell_target":   round(resistance, 0),
             "method_details": details,
         }

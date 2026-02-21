@@ -262,8 +262,8 @@ def render(db):
 
                             vcp = VCPStrategy()
                             ema = EMAPullbackStrategy()
-                            vcp_sig = vcp.analyze(sym_sel, df)
-                            ema_sig = ema.analyze(sym_sel, df)
+                            vcp_sig = vcp.analyze(df)
+                            ema_sig = ema.analyze(df)
 
                             engine     = SignalGenerator(db=db)
                             final_sig  = engine.generate(sym_sel, [vcp_sig, ema_sig])
