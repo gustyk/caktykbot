@@ -6,9 +6,10 @@ from db.connection import get_database
 from db.repositories.trade_repo import TradeRepository
 from db.repositories.portfolio_repo import PortfolioRepository
 
+from dashboard.auth import require_login, logout
 from dashboard.pages import overview, breakdowns, psychology, backtest, journal, watchlist
 
-# ── Page Config ───────────────────────────────────────────────────────────────
+# ── Page Config (MUST be first Streamlit call) ───────────────────────────────
 st.set_page_config(
     page_title="CakTykBot Analytics",
     page_icon="📊",
@@ -20,6 +21,10 @@ st.set_page_config(
         "About": "CakTykBot — IDX Trading Analytics Dashboard",
     }
 )
+
+# ── Auth gate (halt here if not logged in) ─────────────────────────────────
+if not require_login():
+    st.stop()
 
 # ── Global CSS ────────────────────────────────────────────────────────────────
 st.markdown("""
@@ -136,6 +141,10 @@ def _build_sidebar(open_count: int, db_ok: bool):
         )
 
         st.caption(f"🕐 {datetime.now().strftime('%d %b %Y  %H:%M')}")
+
+        st.divider()
+        if st.button("🔓 Logout", use_container_width=True):
+            logout()
 
     # Strip emoji/spacing prefix to get clean page name
     return page.split("  ", 1)[-1].strip()
