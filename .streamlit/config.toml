@@ -1,0 +1,11 @@
+[browser]
+# Disable telemetry to segment.io (eliminates ERR_BLOCKED_BY_CLIENT console error)
+gatherUsageStats = false
+
+[server]
+headless = true
+enableCORS = false
+enableXsrfProtection = false
+
+[theme]
+base = "dark"

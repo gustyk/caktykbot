@@ -81,9 +81,10 @@ def start_dashboard_subprocess(port: int) -> "subprocess.Popen":
         sys.executable, "-m", "streamlit", "run", "dashboard/app.py",
         "--server.port", str(port),
         "--server.address", "0.0.0.0",
-        "--server.headless", "true",        # required for Railway (no browser)
+        "--server.headless", "true",            # required for Railway (no browser)
         "--server.enableCORS", "false",
         "--server.enableXsrfProtection", "false",
+        "--browser.gatherUsageStats", "false",  # disable segment.io telemetry
     ]
     logger.info(f"Starting Streamlit dashboard as background process on port {port}...")
     proc = subprocess.Popen(
