@@ -167,20 +167,20 @@ def render(db):
                             except StockNotFoundError as e:
                                 st.error(str(e))
 
-                    # Hard delete (with confirmation)
+                    # Hard delete (with confirmation via checkbox)
                     with qa2:
-                        with st.popover(f"🗑️ Hapus {selected}"):
-                            st.warning(
-                                f"Hapus **{selected}** secara permanen dari database?\n\n"
-                                "Data historis harga akan tetap ada."
-                            )
-                            if st.button("Ya, hapus permanen", key="confirm_del", type="primary"):
-                                deleted = repo.delete_stock(selected)
-                                if deleted:
-                                    st.success(f"🗑️ {selected} dihapus.")
-                                    _reload()
-                                else:
-                                    st.error("Gagal menghapus.")
+                        confirm_del = st.checkbox(
+                            f"⚠️ Hapus {selected} permanen?",
+                            key="chk_del_stock",
+                        )
+                    if confirm_del:
+                        if qa3.button("Ya, hapus", key="confirm_del", type="primary"):
+                            deleted = repo.delete_stock(selected)
+                            if deleted:
+                                st.success(f"🗑️ {selected} dihapus.")
+                                _reload()
+                            else:
+                                st.error("Gagal menghapus.")
 
     # ══════════════════════════════════════════════════════════════════════════
     # TAB 2 – ADD

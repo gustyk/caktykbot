@@ -482,15 +482,16 @@ def render(db):
                 except Exception as e:
                     st.error(f"❌ Gagal: {e}")
 
-            # Delete with confirmation
+            # Delete with confirmation (checkbox-gated — compatible with all Streamlit versions)
             st.divider()
             st.markdown("#### 🗑️ Hapus Trade")
-            st.warning(
-                f"Hapus trade **{t.get('symbol')} ({t.get('status')})** secara permanen?"
+            confirm_del = st.checkbox(
+                f"⚠️ Saya yakin ingin menghapus **{t.get('symbol')} ({t.get('status')})** secara permanen",
+                key="chk_del_trade",
             )
-            with st.popover("🗑️ Hapus Permanen"):
+            if confirm_del:
                 st.error("Tindakan ini tidak bisa dibatalkan!")
-                if st.button("✅ Ya, hapus", key="confirm_del_trade", type="primary"):
+                if st.button("🗑️ Ya, hapus permanen", key="confirm_del_trade", type="primary"):
                     try:
                         from bson.objectid import ObjectId
                         repo.collection.delete_one({"_id": ObjectId(trade_id)})
