@@ -7,7 +7,7 @@ from db.connection import get_database
 from db.repositories.trade_repo import TradeRepository
 from db.repositories.portfolio_repo import PortfolioRepository
 
-from dashboard.pages import overview, breakdowns, psychology, backtest
+from dashboard.pages import overview, breakdowns, psychology, backtest, journal
 
 # Page Config
 st.set_page_config(
@@ -60,8 +60,10 @@ def main():
     
     # Fetch Data
     trades = trade_repo.get_all_closed_trades()
+    all_trades = trade_repo.get_all_trades()          # open + closed + draft
     # Convert Pydantic models to dicts for pandas
-    trade_dicts = [t.model_dump() for t in trades]
+    trade_dicts     = [t.model_dump() for t in trades]
+    all_trade_dicts = [t.model_dump() for t in all_trades]
     
     # Portfolio Config
     config = portfolio_repo.get_config("nesa") # Default user
@@ -69,7 +71,10 @@ def main():
     
     # Sidebar
     st.sidebar.title("CakTykBot 🤖")
-    page = st.sidebar.radio("Navigation", ["Overview", "Breakdowns", "Psychology", "Backtest"])
+    page = st.sidebar.radio(
+        "Navigation",
+        ["Overview", "Journal", "Breakdowns", "Psychology", "Backtest"]
+    )
     
     st.sidebar.divider()
     st.sidebar.caption(f"Last updated: {datetime.now().strftime('%H:%M:%S')}")
@@ -77,6 +82,8 @@ def main():
     # Page Routing
     if page == "Overview":
         overview.render(trade_dicts, initial_capital)
+    elif page == "Journal":
+        journal.render(all_trade_dicts)
     elif page == "Breakdowns":
         breakdowns.render(trade_dicts)
     elif page == "Psychology":
