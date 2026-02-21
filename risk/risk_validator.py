@@ -36,7 +36,7 @@ class RiskValidator:
     def __init__(self):
         self.circuit_breaker = CircuitBreaker()
         
-    async def validate(
+    def validate(
         self,
         signal: Dict[str, Any],
         open_trades: List[Dict],
@@ -121,8 +121,8 @@ class RiskValidator:
              
         # 4. Sector Diversification (RR-005)
         # We need sector info for the symbol
-        sector, market_cap = await get_sector_info(symbol, db=db)
-        sector_check = await check_sector_limit(
+        sector, market_cap = get_sector_info(symbol, db=db)
+        sector_check = check_sector_limit(
             symbol, 
             sector, 
             open_trades,

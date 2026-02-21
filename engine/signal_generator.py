@@ -49,7 +49,7 @@ class SignalGenerator:
         from risk.risk_validator import RiskValidator
         self.risk_validator = RiskValidator()
 
-    async def generate(
+    def generate(
         self, 
         symbol: str, 
         strategy_signals: List[Optional[StrategySignal]],
@@ -178,7 +178,7 @@ class SignalGenerator:
                 base_signal.reasoning += f" [Adaptive Score: {adaptive_score}]"
 
                 # 5. Run Validation
-                risk_result = await self.risk_validator.validate(
+                risk_result = self.risk_validator.validate(
                     signal={
                         "symbol": symbol,
                         "entry_price": best_signal.entry_price,

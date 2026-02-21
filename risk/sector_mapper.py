@@ -10,7 +10,7 @@ from risk.constants import (
     MSG_SECTOR_LIMIT
 )
 
-async def get_sector_info(symbol: str, db=None) -> Tuple[str, str]:
+def get_sector_info(symbol: str, db=None) -> Tuple[str, str]:
     """
     Get sector and market cap category for a symbol.
     Returns (sector, market_cap_category).
@@ -28,7 +28,7 @@ async def get_sector_info(symbol: str, db=None) -> Tuple[str, str]:
     return "Other", "small"
 
 
-async def check_sector_limit(
+def check_sector_limit(
     symbol: str, 
     sector: str, 
     open_trades: List[Dict],
