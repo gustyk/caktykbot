@@ -153,39 +153,93 @@ def fetch_live_quote(symbol: str) -> dict:
     return out
 
 
-# ── public: batch live prices (cached) ───────────────────────────────────────
+# ── public: batch live prices (parallel, cached) ────────────────────────────
 
-@st.cache_data(ttl=180, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def batch_live_prices(symbols: tuple) -> dict[str, dict]:
-    """Fetch latest close + change% for multiple tickers.
+    """Fetch latest close + change% for multiple tickers — parallel.
+
+    Strategy (fastest first):
+      1. yf.Ticker.fast_info  — no historical download, just the last tick
+      2. yf.Ticker.history('5d') — fallback, no retry in batch
+
+    Uses ThreadPoolExecutor (max 6 workers) so 14 tickers finish in ~3-5s
+    instead of 14 × 5-30s = minutes.  Hard 20-second global timeout ensures
+    the spinner never hangs, even if Railway's IP is being throttled.
 
     Args:
-        symbols: *Tuple* of ticker strings (tuple required for st.cache_data).
+        symbols: *Tuple* of ticker strings (required for st.cache_data).
     """
+    from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FuturesTimeout
+
     result: dict[str, dict] = {}
     if not symbols:
         return result
 
-    for sym in symbols:
+    _empty = {"price": None, "change_pct": None}
+
+    def _fetch_one(sym: str) -> tuple[str, dict]:
+        # ── Fast path: fast_info (single HTTP call, no OHLCV download) ─────
         try:
-            df = _history(sym, period="5d")
+            fi    = yf.Ticker(sym).fast_info
+            price = getattr(fi, "last_price", None)
+            prev  = getattr(fi, "previous_close", None)
+            if price and float(price) > 0:
+                chg = None
+                if prev and float(prev) > 0:
+                    chg = (float(price) - float(prev)) / float(prev) * 100
+                return sym, {"price": float(price), "change_pct": chg}
+        except Exception:
+            pass
+
+        # ── Fallback: 5-day history, no retry ────────────────────────────────
+        try:
+            df = _history(sym, period="5d", retries=0)
             if df.empty or "Close" not in df.columns:
-                result[sym] = {"price": None, "change_pct": None}
-                continue
+                return sym, _empty
             closes = df["Close"].dropna()
             if len(closes) == 0:
-                result[sym] = {"price": None, "change_pct": None}
-                continue
+                return sym, _empty
             price = float(closes.iloc[-1])
             prev  = float(closes.iloc[-2]) if len(closes) >= 2 else price
-            result[sym] = {
-                "price":      price,
-                "change_pct": (price - prev) / prev * 100 if prev else None,
-            }
-        except Exception as e:
-            logger.warning(f"batch_live_prices {sym}: {e}")
-            result[sym] = {"price": None, "change_pct": None}
+            chg   = (price - prev) / prev * 100 if prev else None
+            return sym, {"price": price, "change_pct": chg}
+        except Exception as exc:
+            logger.warning(f"batch_live_prices {sym}: {exc}")
+            return sym, _empty
 
+    # Parallel fetch — 6 workers covers 14 tickers in ~2 rounds
+    n_workers = min(len(symbols), 6)
+    GLOBAL_TIMEOUT = 20  # seconds — hard cap on total batch time
+
+    try:
+        with ThreadPoolExecutor(max_workers=n_workers, thread_name_prefix="price") as ex:
+            futures = {ex.submit(_fetch_one, sym): sym for sym in symbols}
+            try:
+                for future in as_completed(futures, timeout=GLOBAL_TIMEOUT):
+                    try:
+                        sym, data = future.result(timeout=2)
+                        result[sym] = data
+                    except Exception as exc:
+                        sym = futures[future]
+                        logger.warning(f"batch price {sym} error: {exc}")
+                        result[sym] = _empty
+            except FuturesTimeout:
+                logger.warning(
+                    f"batch_live_prices: global {GLOBAL_TIMEOUT}s timeout reached. "
+                    f"Got {len(result)}/{len(symbols)} tickers."
+                )
+    except Exception as exc:
+        logger.error(f"batch_live_prices executor error: {exc}")
+
+    # Ensure every requested symbol has an entry (avoids KeyError in UI)
+    for sym in symbols:
+        result.setdefault(sym, _empty)
+
+    logger.info(
+        f"batch_live_prices: {sum(1 for v in result.values() if v['price'])} "
+        f"/ {len(symbols)} prices fetched"
+    )
     return result
 
 
