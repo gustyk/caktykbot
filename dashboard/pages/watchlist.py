@@ -13,7 +13,7 @@ from utils.exceptions import (
     WatchlistFullError,
     StockNotFoundError,
 )
-from dashboard.utils.stock_info import (
+from dashboard.components.stock_info import (
     fetch_stock_meta,
     fetch_support_resistance,
     batch_live_prices,
