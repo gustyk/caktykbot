@@ -283,30 +283,27 @@ def fetch_support_resistance(symbol: str, period: str = "6mo") -> dict:
         details.append(f"🕯️ Swing lows  (recent 5): {[round(x) for x in sw_lo[-5:]]}")
         details.append(f"🕯️ Swing highs (recent 5): {[round(x) for x in sw_hi[-5:]]}")
 
-        # ── Pick nearest support below / resistance above ─────────────────────
-        s_below = [v for v in supports    if v < cur]
-        r_above = [v for v in resistances if v > cur]
-        support    = float(max(s_below)) if s_below else S1
-        resistance = float(min(r_above)) if r_above else R1
+        # ── Pick support ≥2% below price, resistance ≥1% above ─────────────────
+        # Prevents Fibonacci/EMA landing exactly at current price being used as
+        # support, which makes buy_low = current_price (un-tradeable plan).
+        MIN_SUP_GAP = 0.02   # support must be ≥2% below current price
+        MIN_RES_GAP = 0.01   # resistance must be ≥1% above current price
 
-        # Guard: if spread too tight (< 1%), widen to next-best S2/R2
-        if resistance > 0 and (resistance - support) / resistance < 0.01:
-            support    = S2 if S2 < support    else support
-            resistance = R2 if R2 > resistance else resistance
-            logger.info(
-                f"S/R {symbol}: spread too tight, widened to S2/R2 → "
-                f"support={support:.0f} resistance={resistance:.0f}"
-            )
+        s_qualified = [v for v in supports    if v <= cur * (1 - MIN_SUP_GAP)]
+        r_qualified = [v for v in resistances if v >= cur * (1 + MIN_RES_GAP)]
 
-        # buy_high must always be strictly below sell_target
-        # Cap at 99.5 % of resistance so the buy zone never overlaps
-        raw_buy_high = support * 1.015
-        buy_high = min(raw_buy_high, resistance * 0.995)
+        # Closest qualified level; fallback to Pivot S1 / R1
+        support    = float(max(s_qualified)) if s_qualified else S1
+        resistance = float(min(r_qualified)) if r_qualified else R1
 
-        # If that still inverts (ultra-tight stock), just use midpoint
-        midpoint = (support + resistance) / 2
-        if buy_high >= resistance:
-            buy_high = midpoint
+        # Final sanity: support must be below resistance
+        if support >= resistance:
+            support, resistance = S2, R2
+
+        # buy_high = top of buy zone — must stay strictly below sell_target
+        buy_high = min(support * 1.015, resistance * 0.995)
+        if buy_high >= resistance:                # ultra-tight: use midpoint
+            buy_high = (support + resistance) / 2
 
         logger.info(
             f"S/R {symbol}: price={cur:.0f} | support={support:.0f} | "

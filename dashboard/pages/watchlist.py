@@ -260,6 +260,12 @@ def render(db):
                             df_raw  = fetcher.fetch_history(sym_sel, period="2y")
                             df      = IndicatorEngine.calculate_all(df_raw)
 
+                            # Strategies expect a 'date' column, not DatetimeIndex
+                            if "date" not in df.columns:
+                                df = df.reset_index().rename(
+                                    columns={df.index.name or "index": "date"}
+                                )
+
                             vcp = VCPStrategy()
                             ema = EMAPullbackStrategy()
                             vcp_sig = vcp.analyze(df)
