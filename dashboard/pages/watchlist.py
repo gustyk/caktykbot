@@ -124,10 +124,11 @@ def render(db):
 
             st.caption(f"Menampilkan {len(filtered)} dari {len(all_stocks)} saham")
 
-            # ── Live prices for filtered symbols (batch) ──────────────────────
-            symbols   = [s.symbol for s in filtered]
+            # ── Live prices for filtered symbols (batch, cached) ─────────────
+            symbols = [s.symbol for s in filtered]
+            # Pass as tuple so st.cache_data can hash it
             with st.spinner("🔄 Mengambil harga live…"):
-                prices = batch_live_prices(symbols) if symbols else {}
+                prices = batch_live_prices(tuple(symbols)) if symbols else {}
 
             # ── Main watchlist table ──────────────────────────────────────────
             rows = []
@@ -201,7 +202,7 @@ def render(db):
                     with st.spinner(f"Menghitung support & resistance untuk {sym_sel}…"):
                         lvl = fetch_support_resistance(sym_sel)
 
-                    if lvl.get("support"):
+                    if lvl.get("support") is not None:
                         l1, l2, l3 = st.columns(3)
                         l1.metric(
                             "📗 Range Beli",
@@ -218,7 +219,7 @@ def render(db):
                         )
 
                         # R/R preview
-                        if lvl["buy_high"] and lvl["sell_target"] and lvl["buy_low"]:
+                        if lvl.get("buy_high") and lvl.get("sell_target") and lvl.get("buy_low"):
                             avg_buy = (lvl["buy_low"] + lvl["buy_high"]) / 2
                             risk    = avg_buy - lvl["support"]
                             reward  = lvl["sell_target"] - avg_buy
@@ -230,8 +231,18 @@ def render(db):
                                     f"⚡ R/R = 1 : {rr:.2f}</span>",
                                     unsafe_allow_html=True,
                                 )
+
+                        # Method details (collapsible)
+                        if lvl.get("method_details"):
+                            with st.expander("📐 Detail perhitungan S/R"):
+                                for d in lvl["method_details"]:
+                                    st.caption(d)
                     else:
-                        st.info("Support/resistance belum bisa dihitung (data tidak cukup).")
+                        st.warning(
+                            "⚠️ Support/resistance tidak bisa dihitung.  \n"
+                            "Pastikan ticker valid dan coba lagi — Yahoo Finance "
+                            "mungkin sedang lambat."
+                        )
 
                 # ── Analyze button ────────────────────────────────────────────
                 st.divider()
