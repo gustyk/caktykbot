@@ -283,11 +283,11 @@ def fetch_support_resistance(symbol: str, period: str = "6mo") -> dict:
         details.append(f"🕯️ Swing lows  (recent 5): {[round(x) for x in sw_lo[-5:]]}")
         details.append(f"🕯️ Swing highs (recent 5): {[round(x) for x in sw_hi[-5:]]}")
 
-        # ── Pick support ≥2% below price, resistance ≥1% above ─────────────────
-        # Prevents Fibonacci/EMA landing exactly at current price being used as
-        # support, which makes buy_low = current_price (un-tradeable plan).
-        MIN_SUP_GAP = 0.02   # support must be ≥2% below current price
-        MIN_RES_GAP = 0.01   # resistance must be ≥1% above current price
+        # ── Pick support ≥2% below price, resistance ≥5% above ─────────────────
+        # MIN_SUP_GAP 2%: buy zone must be a real pullback, not at current price
+        # MIN_RES_GAP 5%: sell target must have meaningful upside, not just 1-2%
+        MIN_SUP_GAP = 0.02
+        MIN_RES_GAP = 0.05
 
         s_qualified = [v for v in supports    if v <= cur * (1 - MIN_SUP_GAP)]
         r_qualified = [v for v in resistances if v >= cur * (1 + MIN_RES_GAP)]
@@ -317,6 +317,7 @@ def fetch_support_resistance(symbol: str, period: str = "6mo") -> dict:
             "buy_low":       round(support, 0),
             "buy_high":      round(buy_high, 0),
             "sell_target":   round(resistance, 0),
+            "upside_pct":    round((resistance - cur) / cur * 100, 1),
             "method_details": details,
         }
 

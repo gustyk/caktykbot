@@ -213,9 +213,11 @@ def render(db):
                             "📗 Support",
                             f"Rp {lvl['support']:,.0f}",
                         )
+                        upside = lvl.get("upside_pct")
                         l3.metric(
                             "📕 Target Jual",
                             f"Rp {lvl['sell_target']:,.0f}",
+                            f"+{upside:.1f}% dari harga sekarang" if upside else None,
                         )
 
                         # R/R preview
@@ -279,28 +281,42 @@ def render(db):
                                 "HOLD": "#f39c12", "WAIT": "#3498db",
                             }.get(final_sig.verdict, "#aaa")
 
-                            st.markdown(
-                                f"<div style='background:#1a1a2e;border:1px solid #252545;"
-                                f"border-radius:10px;padding:16px 20px;'>"
-                                f"<h4 style='margin:0 0 8px 0;color:#00ADB5'>{sym_sel} — Hasil Analisis</h4>"
-                                f"<span style='font-size:1.4em;font-weight:800;color:{verdict_colour}'>"
-                                f"{final_sig.verdict}</span> &nbsp;"
-                                f"<span style='color:#aaa;font-size:0.9em'>({final_sig.confidence} confidence | "
-                                f"Skor: {final_sig.tech_score:.0f})</span><br><br>"
-                                f"<b>Entry:</b> Rp {final_sig.entry_price:,.0f} &nbsp;|&nbsp;"
-                                f"<b>SL:</b> Rp {final_sig.sl_price:,.0f} &nbsp;|&nbsp;"
-                                f"<b>TP:</b> Rp {final_sig.tp_price:,.0f} &nbsp;|&nbsp;"
-                                f"<b>R/R:</b> 1:{final_sig.rr_ratio:.2f}<br><br>"
-                                f"<span style='color:#ccc;font-size:0.88em'>{final_sig.reasoning}</span>"
-                                f"</div>",
-                                unsafe_allow_html=True,
-                            )
+                            has_setup = final_sig.verdict in ("BUY", "SELL") and final_sig.entry_price > 0
 
-                            if final_sig.risk_blocked:
-                                st.warning(f"⚠️ Sinyal diblokir risk: {final_sig.block_reason}")
-                            elif final_sig.risk_warnings:
-                                for w in final_sig.risk_warnings:
-                                    st.warning(f"⚠️ {w}")
+                            if has_setup:
+                                # Full trade plan
+                                st.markdown(
+                                    f"<div style='background:#1a1a2e;border:1px solid #252545;"
+                                    f"border-radius:10px;padding:16px 20px;'>"
+                                    f"<h4 style='margin:0 0 8px 0;color:#00ADB5'>{sym_sel} — Hasil Analisis</h4>"
+                                    f"<span style='font-size:1.4em;font-weight:800;color:{verdict_colour}'>"
+                                    f"{final_sig.verdict}</span> &nbsp;"
+                                    f"<span style='color:#aaa;font-size:0.9em'>({final_sig.confidence} confidence | "
+                                    f"Skor: {final_sig.tech_score:.0f})</span><br><br>"
+                                    f"<b>Entry:</b> Rp {final_sig.entry_price:,.0f} &nbsp;|&nbsp;"
+                                    f"<b>SL:</b> Rp {final_sig.sl_price:,.0f} &nbsp;|&nbsp;"
+                                    f"<b>TP:</b> Rp {final_sig.tp_price:,.0f} &nbsp;|&nbsp;"
+                                    f"<b>R/R:</b> 1:{final_sig.rr_ratio:.2f}<br><br>"
+                                    f"<span style='color:#ccc;font-size:0.88em'>{final_sig.reasoning}</span>"
+                                    f"</div>",
+                                    unsafe_allow_html=True,
+                                )
+                                if final_sig.risk_blocked:
+                                    st.warning(f"⚠️ Sinyal diblokir risk: {final_sig.block_reason}")
+                                elif final_sig.risk_warnings:
+                                    for w in final_sig.risk_warnings:
+                                        st.warning(f"⚠️ {w}")
+                            else:
+                                # No valid setup — explain clearly
+                                st.info(
+                                    f"🔍 **{sym_sel}** tidak memenuhi kriteria setup saat ini.  \n"
+                                    f"Strategi VCP dan EMA Pullback tidak mendeteksi entry signal.  \n\n"
+                                    f"📄 *{final_sig.reasoning}*"
+                                )
+                                st.caption(
+                                    "Ini **normal** — strategi hanya entry saat pola breakout/retest "
+                                    "terkonfirmasi. Pantau kembali saat harga mendekati support."
+                                )
 
                         except Exception as e:
                             st.error(f"❌ Analisis gagal: {e}")
