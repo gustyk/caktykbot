@@ -1,6 +1,7 @@
 """Bot manager to handle lifecycle and wiring."""
 
 import sys
+import asyncio
 import time
 from telegram import error as tg_error
 from telegram.ext import Application, CommandHandler
@@ -33,20 +34,29 @@ from bot.handlers.bandar_handler import handle_bandar_command
 from bot.handlers.insight_handler import handle_bias_command, handle_scores_command
 
 
+# ── Grace period before first poll attempt ────────────────────────────────────
+# Railway needs ~15-30 s to kill the old container. We wait upfront so we
+# (almost) never hit a Conflict at all. Configurable via env var for testing.
+import os
+_STARTUP_GRACE = int(os.environ.get("BOT_STARTUP_GRACE_SECONDS", "30"))
+
+
 async def _error_handler(update, context):
     """Global error handler for the bot.
-    
-    NOTE: Conflict errors are handled by the retry loop in BotManager.run(),
-    NOT by exiting here. Exiting on Conflict causes Railway to immediately
-    restart, which hits the same Conflict — creating an infinite restart loop.
+
+    On Conflict we stop the application so the run() loop can apply
+    a backoff delay before the next attempt — without Railway triggering
+    an infinite restart loop.
     """
     err = context.error
     if isinstance(err, tg_error.Conflict):
-        # Just log — the run() retry loop will handle waiting & retrying.
         logger.warning(
-            "⚡ Conflict detected (another instance still active). "
-            "Waiting for old container to shut down..."
+            "⚡ Conflict: another bot instance is still active. "
+            "Stopping this attempt — will retry after backoff..."
         )
+        # Gracefully stop polling so run() can sleep and retry.
+        await context.application.stop()
+        await context.application.shutdown()
     elif isinstance(err, tg_error.NetworkError):
         logger.warning(f"Network error (will retry): {err}")
     elif isinstance(err, tg_error.TimedOut):
@@ -102,23 +112,37 @@ class BotManager:
 
     def run(self):
         """Run the bot in polling mode with Conflict retry logic.
-        
-        On Railway, a new container starts before the old one is killed.
-        This causes a transient Conflict error (~30-60s). We retry with
-        a backoff instead of exiting, which would cause an infinite loop.
+
+        Strategy:
+        1. Wait _STARTUP_GRACE seconds before the first attempt — this alone
+           prevents most Conflicts since Railway kills the old container in ~15s.
+        2. If a Conflict does slip through, exponential-backoff retry.
+        3. After max_retries, exit(1) so Railway can redeploy cleanly.
         """
-        max_retries = 10
-        retry_delay = 30  # seconds — Railway typically kills old container within 30s
+        max_retries = 8
+        base_delay  = 20   # seconds for first retry
+
+        # ── Startup grace period ──────────────────────────────────────────────
+        if _STARTUP_GRACE > 0:
+            logger.info(
+                f"⏳ Waiting {_STARTUP_GRACE}s startup grace period before polling "
+                "(allows old Railway container to shut down)..."
+            )
+            time.sleep(_STARTUP_GRACE)
 
         for attempt in range(1, max_retries + 1):
             try:
-                logger.info(f"Starting Telegram bot (polling mode, attempt {attempt}/{max_retries})...")
-                # run_polling is blocking. drop_pending_updates clears stale sessions.
+                logger.info(
+                    f"Starting Telegram bot (polling mode, "
+                    f"attempt {attempt}/{max_retries})..."
+                )
                 self.app.run_polling(
                     drop_pending_updates=True,
                     allowed_updates=None,
+                    # Close gracefully on stop signal from error handler
+                    close_loop=False,
                 )
-                # If run_polling() returns normally (e.g. graceful shutdown), exit loop
+                # run_polling() returned normally → graceful shutdown
                 logger.info("Bot polling stopped gracefully.")
                 break
 
@@ -130,14 +154,13 @@ class BotManager:
                     )
                     sys.exit(1)
 
+                delay = base_delay * (2 ** (attempt - 1))  # 20, 40, 80 ...
                 logger.warning(
                     f"⚡ Conflict on attempt {attempt}/{max_retries}. "
-                    f"Old container still active — waiting {retry_delay}s before retry..."
+                    f"Old container still active — retrying in {delay}s..."
                 )
-                # Rebuild the Application so we get a fresh HTTP connection pool
-                # (the old one may be in a broken state after Conflict)
                 self._rebuild_app()
-                time.sleep(retry_delay)
+                time.sleep(delay)
 
             except Exception as e:
                 logger.critical(f"Bot crashed unexpectedly: {e}")
