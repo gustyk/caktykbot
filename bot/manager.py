@@ -2,15 +2,20 @@ import os
 import sys
 import asyncio
 import time
-from telegram import error as tg_error
-from telegram.ext import Application, CommandHandler
+from telegram import Update, BotCommand, error as tg_error
+from telegram.ext import Application, CommandHandler, ContextTypes
 from telegram.request import HTTPXRequest
 from loguru import logger
 
 from config.settings import settings
+from bot.handlers.menu_handler import (
+    handle_start_command,
+    handle_menu_command,
+    menu_callback_handler,
+)
 from bot.handlers.watchlist import (
-    handle_add_stock, 
-    handle_remove_stock, 
+    handle_add_stock,
+    handle_remove_stock,
     handle_list_watchlist
 )
 from bot.handlers.signal_handler import handle_signal_command
@@ -19,8 +24,8 @@ from bot.handlers.portfolio_handler import handle_capital_command, handle_risk_c
 from bot.handlers.trade_entry_handler import add_trade_handler, close_trade_handler
 from bot.handlers.follow_handler import handle_follow_command, handle_confirm_command
 from bot.handlers.journal_handler import (
-    handle_journal_command, 
-    handle_stats_command, 
+    handle_journal_command,
+    handle_stats_command,
     handle_trade_detail_command,
     handle_export_command
 )
@@ -85,33 +90,79 @@ class BotManager:
 
     def _setup_handlers(self):
         """Register command handlers."""
-        self.app.add_handler(CommandHandler("add", handle_add_stock))
-        self.app.add_handler(CommandHandler("remove", handle_remove_stock))
+        # ── Menu & navigation ─────────────────────────────────────────────
+        self.app.add_handler(CommandHandler("start", handle_start_command))
+        self.app.add_handler(CommandHandler("menu",  handle_menu_command))
+        self.app.add_handler(menu_callback_handler)   # inline keyboard callbacks
+
+        # ── Watchlist ───────────────────────────────────────────────────
+        self.app.add_handler(CommandHandler("add",       handle_add_stock))
+        self.app.add_handler(CommandHandler("remove",    handle_remove_stock))
         self.app.add_handler(CommandHandler("watchlist", handle_list_watchlist))
-        self.app.add_handler(CommandHandler("signal", handle_signal_command))
+        self.app.add_handler(CommandHandler("follow",    handle_follow_command))
+        self.app.add_handler(CommandHandler("confirm",   handle_confirm_command))
+
+        # ── Analisis & sinyal ──────────────────────────────────────────
+        self.app.add_handler(CommandHandler("signal",  handle_signal_command))
         self.app.add_handler(CommandHandler("analyze", handle_analyze_command))
-        self.app.add_handler(CommandHandler("capital", handle_capital_command))
-        self.app.add_handler(CommandHandler("risk", handle_risk_command))
-        self.app.add_handler(CommandHandler("size", handle_size_command))  # Sprint 4
-        self.app.add_handler(CommandHandler("heat", handle_heat_command))  # Sprint 4
-        self.app.add_handler(CommandHandler("follow", handle_follow_command))
-        self.app.add_handler(CommandHandler("confirm", handle_confirm_command))
+        self.app.add_handler(CommandHandler("bandar",  handle_bandar_command))
+        self.app.add_handler(CommandHandler("bias",    handle_bias_command))
+        self.app.add_handler(CommandHandler("scores",  handle_scores_command))
+
+        # ── Jurnal ────────────────────────────────────────────────────────
         self.app.add_handler(CommandHandler("journal", handle_journal_command))
-        self.app.add_handler(CommandHandler("stats", handle_stats_command))
-        self.app.add_handler(CommandHandler("trade", handle_trade_detail_command))
-        self.app.add_handler(CommandHandler("export", handle_export_command))
+        self.app.add_handler(CommandHandler("stats",   handle_stats_command))
+        self.app.add_handler(CommandHandler("trade",   handle_trade_detail_command))
+        self.app.add_handler(CommandHandler("export",  handle_export_command))
         self.app.add_handler(add_trade_handler)
         self.app.add_handler(close_trade_handler)
-        self.app.add_handler(CommandHandler("backtest", backtest_command))
-        self.app.add_handler(CommandHandler("report", report_command))
-        self.app.add_handler(CommandHandler("health", health_command))
-        self.app.add_handler(CommandHandler("bandar", handle_bandar_command))
-        self.app.add_handler(CommandHandler("bias", handle_bias_command))
-        self.app.add_handler(CommandHandler("scores", handle_scores_command))
 
-        # Register global error handler
+        # ── Risk & sizing ───────────────────────────────────────────────
+        self.app.add_handler(CommandHandler("size",  handle_size_command))
+        self.app.add_handler(CommandHandler("heat",  handle_heat_command))
+
+        # ── Portfolio ─────────────────────────────────────────────────────
+        self.app.add_handler(CommandHandler("capital", handle_capital_command))
+        self.app.add_handler(CommandHandler("risk",    handle_risk_command))
+        self.app.add_handler(CommandHandler("health",  health_command))
+
+        # ── Riset & backtest ────────────────────────────────────────────
+        self.app.add_handler(CommandHandler("backtest", backtest_command))
+        self.app.add_handler(CommandHandler("report",   report_command))
+
+        # ── Error handler ────────────────────────────────────────────────
         self.app.add_error_handler(_error_handler)
+
+        # ── Register bot commands (auto-complete di keyboard Telegram) ─────────
+        self.app.post_init = self._set_bot_commands
         logger.info("Bot handlers registered successfully.")
+
+    @staticmethod
+    async def _set_bot_commands(app: Application) -> None:
+        """Set bot command list so Telegram shows autocomplete on '/'."""
+        commands = [
+            BotCommand("menu",      "📊 Tampilkan menu utama"),
+            BotCommand("signal",    "🟢 Sinyal BUY hari ini"),
+            BotCommand("watchlist", "📋 Daftar saham watchlist"),
+            BotCommand("add",       "➕ Tambah saham ke watchlist"),
+            BotCommand("remove",    "➖ Hapus saham dari watchlist"),
+            BotCommand("analyze",   "🔬 Analisis teknikal saham"),
+            BotCommand("bandar",    "👁 Deteksi pola bandarmologi"),
+            BotCommand("journal",   "📒 Jurnal & posisi terbuka"),
+            BotCommand("stats",     "📊 Statistik P&L & win rate"),
+            BotCommand("size",      "📝 Hitung lot size optimal"),
+            BotCommand("heat",      "🔥 Portfolio heat saat ini"),
+            BotCommand("capital",   "💰 Set total modal"),
+            BotCommand("risk",      "🛡 Set risk per trade (%)"),
+            BotCommand("backtest",  "🧪 Backtest strategi saham"),
+            BotCommand("report",    "📄 Laporan performa strategi"),
+            BotCommand("bias",      "🧠 Market bias IHSG"),
+            BotCommand("scores",    "⭐ Skor adaptif strategi"),
+            BotCommand("health",    "💫 Status sistem bot"),
+            BotCommand("export",    "📤 Export trade ke CSV"),
+        ]
+        await app.bot.set_my_commands(commands)
+        logger.info(f"Bot commands registered: {len(commands)} commands")
 
     def run(self):
         """Run the bot with startup grace period + PTB native Conflict handling.
